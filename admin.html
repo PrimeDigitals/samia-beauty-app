@@ -2,63 +2,104 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>لوحة التحكم - سامية بيوتي</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة تحكم سامية بيوتي | الإدارة المركزية</title>
+    
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
     <style>
-        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f4f7f6; margin: 0; display: flex; }
-        .sidebar { width: 250px; background: #333; color: white; height: 100vh; position: fixed; right: 0; padding: 20px; }
-        .sidebar h2 { color: #d4af37; text-align: center; }
-        .menu-item { padding: 15px; border-bottom: 1px solid #444; cursor: pointer; }
-        .menu-item:hover { background: #444; color: #d4af37; }
-        .content { margin-right: 250px; flex: 1; padding: 30px; }
-        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { padding: 12px; text-align: right; border-bottom: 1px solid #eee; }
-        th { background: #f8f8f8; }
-        .btn { padding: 8px 15px; background: #d4af37; color: white; border: none; border-radius: 5px; cursor: pointer; }
-        input, textarea { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
+        :root { --primary: #d4af37; --secondary: #5a3e4a; --bg: #f4f7f6; --white: #ffffff; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); margin: 0; display: flex; direction: rtl; }
+        
+        /* Sidebar */
+        .sidebar { width: 260px; background: #333; color: white; height: 100vh; position: fixed; right: 0; padding: 20px; box-sizing: border-box; z-index: 100; }
+        .sidebar h2 { color: var(--primary); text-align: center; border-bottom: 1px solid #444; padding-bottom: 15px; margin-top: 0; }
+        .menu-item { padding: 15px; border-radius: 8px; cursor: pointer; transition: 0.3s; margin-bottom: 5px; display: flex; align-items: center; gap: 10px; }
+        .menu-item:hover, .menu-item.active { background: var(--primary); color: white; }
+        
+        /* Main Content */
+        .main-content { margin-right: 260px; flex: 1; padding: 40px; min-height: 100vh; box-sizing: border-box; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        .card { background: var(--white); padding: 25px; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 25px; }
+        
+        /* Table Styles */
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th { background: #f8f9fa; color: #666; padding: 15px; text-align: right; font-weight: 600; border-bottom: 2px solid #eee; }
+        td { padding: 15px; border-bottom: 1px solid #eee; vertical-align: middle; }
+        tr:hover { background: #fafafa; }
+        
+        /* Buttons & Inputs */
+        .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .btn-add { background: #28a745; color: white; }
+        .btn-save { background: var(--primary); color: white; width: 100%; margin-top: 10px; }
+        input, textarea { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-family: inherit; }
+        
+        .status-badge { padding: 5px 10px; border-radius: 20px; font-size: 12px; background: #e1f5fe; color: #0288d1; }
+        #loading { text-align: center; color: var(--primary); font-weight: bold; }
     </style>
 </head>
 <body onload="initAdmin()">
+
 <div class="sidebar">
     <h2>سامية بيوتي</h2>
-    <div class="menu-item" onclick="showTab('cust')">إدارة العميلات</div>
-    <div class="menu-item" onclick="showTab('notif')">إرسال إشعارات</div>
-    <div class="menu-item" onclick="showTab('settings')">الإعدادات</div>
+    <div class="menu-item active" onclick="switchTab('custTab', this)"><i class="fa fa-users"></i> إدارة العميلات</div>
+    <div class="menu-item" onclick="switchTab('notifTab', this)"><i class="fa fa-bell"></i> الإشعارات</div>
+    <div class="menu-item" onclick="switchTab('settingsTab', this)"><i class="fa fa-cog"></i> إعدادات المتجر</div>
 </div>
 
-<div class="content">
-    <div id="custTab">
+<div class="main-content">
+    <div class="header">
+        <h1>لوحة التحكم</h1>
+        <div id="connectionStatus" class="status-badge">جاري الاتصال بـ Firebase...</div>
+    </div>
+
+    <div id="custTab" class="tab-content">
         <div class="card">
-            <h3>العميلات المسجلات (<span id="count">0</span>)</h3>
+            <h3>العميلات المسجلات (إجمالي: <span id="totalCust">0</span>)</h3>
+            <input type="text" id="searchBar" onkeyup="searchTable()" placeholder="ابحثي عن عميلة بالاسم أو الرقم...">
             <table>
-                <thead><tr><th>الاسم</th><th>الجوال</th><th>النقاط</th><th>الإجراء</th></tr></thead>
-                <tbody id="userTable"></tbody>
+                <thead>
+                    <tr>
+                        <th>الاسم</th>
+                        <th>رقم الجوال</th>
+                        <th>النقاط الحالية</th>
+                        <th>آخر تحديث</th>
+                        <th>الإجراءات</th>
+                    </tr>
+                </thead>
+                <tbody id="userTableBody">
+                    </tbody>
             </table>
+            <div id="loading">جاري جلب البيانات...</div>
         </div>
     </div>
 
-    <div id="notifTab" style="display:none;">
+    <div id="notifTab" class="tab-content" style="display:none;">
         <div class="card">
-            <h3>إرسال إشعار عام</h3>
-            <input type="text" id="ntitle" placeholder="عنوان الإشعار">
-            <textarea id="nbody" placeholder="نص الرسالة"></textarea>
-            <button class="btn" onclick="alert('سيتم الإرسال لجميع الأجهزة المفعلة قريباً!')">إرسال الآن</button>
+            <h3>إرسال إشعار عام للجميع</h3>
+            <p style="color: #666; font-size: 14px;">سيصل هذا الإشعار لجميع العميلات اللاتي قمن بتفعيل الإشعارات على هواتفهن.</p>
+            <input type="text" id="notifTitle" placeholder="عنوان الإشعار (مثلاً: خصم جديد!)">
+            <textarea id="notifBody" rows="4" placeholder="نص الرسالة..."></textarea>
+            <button class="btn btn-save" onclick="sendBroadcast()">إرسال الإشعار الآن</button>
         </div>
     </div>
 
-    <div id="settingsTab" style="display:none;">
+    <div id="settingsTab" class="tab-content" style="display:none;">
         <div class="card">
-            <h3>إعدادات المتجر</h3>
-            <label>رابط اللوجو:</label><input type="text" id="sLogo">
-            <label>ملاحظة النقاط:</label><input type="text" id="sNote">
-            <button class="btn" onclick="saveSettings()">حفظ التغييرات</button>
+            <h3>إعدادات الموقع والشعار</h3>
+            <label>رابط شعار الصالون (URL):</label>
+            <input type="text" id="setLogo" placeholder="https://example.com/logo.png">
+            <label>رسالة ملاحظة النقاط (تظهر للعميلة):</label>
+            <input type="text" id="setNote" placeholder="مثلاً: كل 100 نقطة تمنحك خصم 50 ريال">
+            <button class="btn btn-save" onclick="saveSettings()">حفظ الإعدادات</button>
         </div>
     </div>
 </div>
 
 <script>
+    // إعدادات Firebase - تأكد من مطابقتها لمشروعك
     const firebaseConfig = {
         apiKey: "AIzaSy...", 
         authDomain: "primedigitals-1802f.firebaseapp.com",
@@ -67,55 +108,98 @@
         messagingSenderId: "774910246237",
         appId: "1:774910246237:web:866236b8a8b13d28913210"
     };
+
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
     function initAdmin() {
-        // مراقبة العميلات لحظياً
-        db.collection("customers").orderBy("createdAt", "desc").onSnapshot(snap => {
-            const tbody = document.getElementById('userTable');
+        // الاستماع اللحظي للعملاء
+        db.collection("customers").orderBy("createdAt", "desc").onSnapshot(snapshot => {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('connectionStatus').innerText = "متصل لحظياً ✅";
+            
+            const tbody = document.getElementById('userTableBody');
             tbody.innerHTML = "";
-            document.getElementById('count').innerText = snap.size;
-            snap.forEach(doc => {
-                const u = doc.data();
-                tbody.innerHTML += `<tr>
-                    <td>${u.name}</td>
-                    <td>${u.phone}</td>
-                    <td>${u.points}</td>
-                    <td><button class="btn" onclick="addPoints('${doc.id}', ${u.points})">+ نقاط</button></td>
-                </tr>`;
+            document.getElementById('totalCust').innerText = snapshot.size;
+
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                const time = data.createdAt ? data.createdAt.toDate().toLocaleString('ar-EG') : 'غير محدد';
+                
+                tbody.innerHTML += `
+                    <tr>
+                        <td><strong>${data.name}</strong></td>
+                        <td>${data.phone}</td>
+                        <td><span style="color:var(--primary); font-weight:bold; font-size:18px;">${data.points}</span></td>
+                        <td style="font-size:12px; color:#888;">${time}</td>
+                        <td>
+                            <button class="btn btn-add" onclick="addPoints('${doc.id}', ${data.points})">
+                                <i class="fa fa-plus"></i> تعديل النقاط
+                            </button>
+                        </td>
+                    </tr>
+                `;
             });
+        }, error => {
+            console.error(error);
+            document.getElementById('connectionStatus').innerText = "خطأ في الاتصال ❌";
         });
+
         loadSettings();
     }
 
-    async function addPoints(id, current) {
-        const p = prompt("كم عدد النقاط المراد إضافتها؟");
-        if(p && !isNaN(p)) {
-            await db.collection("customers").doc(id).update({ points: current + parseInt(p) });
+    // دالة إضافة/خصم النقاط
+    async function addPoints(docId, currentPoints) {
+        const amount = prompt(`النقاط الحالية: ${currentPoints}\nأدخلي النقاط المراد إضافتها (أو رقم سالب للخصم):`, "10");
+        if (amount !== null && !isNaN(amount) && amount !== "") {
+            const newTotal = currentPoints + parseInt(amount);
+            await db.collection("customers").doc(docId).update({
+                points: newTotal
+            });
         }
     }
 
+    // حفظ إعدادات الشعار والملاحظات
     async function saveSettings() {
+        const logo = document.getElementById('setLogo').value;
+        const note = document.getElementById('setNote').value;
         await db.collection("settings").doc("main").set({
-            logoUrl: document.getElementById('sLogo').value,
-            pointNote: document.getElementById('sNote').value
+            logoUrl: logo,
+            pointNote: note
         }, { merge: true });
-        alert("تم الحفظ");
+        alert("تم حفظ الإعدادات بنجاح!");
     }
 
     async function loadSettings() {
         const doc = await db.collection("settings").doc("main").get();
         if(doc.exists) {
-            document.getElementById('sLogo').value = doc.data().logoUrl || "";
-            document.getElementById('sNote').value = doc.data().pointNote || "";
+            document.getElementById('setLogo').value = doc.data().logoUrl || "";
+            document.getElementById('setNote').value = doc.data().pointNote || "";
         }
     }
 
-    function showTab(t) {
-        document.getElementById('custTab').style.display = t === 'cust' ? 'block' : 'none';
-        document.getElementById('notifTab').style.display = t === 'notif' ? 'block' : 'none';
-        document.getElementById('settingsTab').style.display = t === 'settings' ? 'block' : 'none';
+    // التنقل بين التبويبات
+    function switchTab(tabId, el) {
+        document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
+        document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('active'));
+        document.getElementById(tabId).style.display = 'block';
+        el.classList.add('active');
+    }
+
+    // دالة البحث في الجدول
+    function searchTable() {
+        const input = document.getElementById("searchBar").value.toLowerCase();
+        const rows = document.getElementById("userTableBody").getElementsByTagName("tr");
+        for (let row of rows) {
+            row.style.display = row.innerText.toLowerCase().includes(input) ? "" : "none";
+        }
+    }
+
+    // دالة وهمية للإشعار (يتم تفعيلها بربطها بـ Cloud Function لاحقاً)
+    function sendBroadcast() {
+        const title = document.getElementById('notifTitle').value;
+        if(!title) return alert("يرجى كتابة عنوان للإشعار");
+        alert("تم تجهيز الإشعار للإرسال إلى جميع الأجهزة المفعلة!");
     }
 </script>
 </body>
