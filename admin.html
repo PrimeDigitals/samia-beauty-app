@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>لوحة التحكم الشاملة - سامية بيوتي</title>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; background: #f4f7f6; }
+        .sidebar { width: 260px; background: #333; color: white; height: 100vh; position: fixed; right: 0; padding: 20px; }
+        .menu-item { padding: 15px; border-bottom: 1px solid #444; cursor: pointer; transition: 0.3s; }
+        .menu-item:hover { background: #444; color: #d4af37; }
+        .content { margin-right: 260px; padding: 40px; flex: 1; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 30px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 12px; text-align: right; border-bottom: 1px solid #eee; }
+        input, textarea { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 6px; }
+        .btn { background: #d4af37; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; }
+        .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); justify-content:center; align-items:center; }
+        .modal-content { background:white; padding:30px; border-radius:10px; width:500px; }
+    </style>
+</head>
+<body onload="initAdmin()">
+
+<div class="sidebar">
+    <h2>سامية بيوتي</h2>
+    <div class="menu-item" onclick="switchTab('stats')">الإحصائيات العامة</div>
+    <div class="menu-item" onclick="switchTab('customers')">إدارة العميلات</div>
+    <div class="menu-item" onclick="switchTab('notif')">إرسال إشعارات</div>
+    <div class="menu-item" onclick="switchTab('settings')">إعدادات البطاقة</div>
+</div>
+
+<div class="content">
+    <div id="stats-tab" class="card">
+        <h3>نظرة عامة</h3>
+        <p>إجمالي العميلات: <span id="totalCust">0</span></p>
+        <p>إجمالي النقاط الموزعة: <span id="totalPoints">0</span></p>
+    </div>
+
+    <div id="customers-tab" class="card" style="display:none;">
+        <h3>قائمة العميلات</h3>
+        <input type="text" id="search" placeholder="ابحث بالاسم أو الجوال..." onkeyup="filterUsers()">
+        <table>
+            <thead><tr><th>الاسم</th><th>الجوال</th><th>النقاط</th><th>الإجراءات</th></tr></thead>
+            <tbody id="userTable"></tbody>
+        </table>
+    </div>
+
+    <div id="settings-tab" class="card" style="display:none;">
+        <h3>تخصيص البطاقة أونلاين</h3>
+        <label>رابط اللوجو:</label><input type="text" id="set_logo">
+        <label>ملاحظة النقاط:</label><input type="text" id="set_note">
+        <label>واتساب:</label><input type="text" id="set_wa">
+        <label>شروط الاستخدام:</label><textarea id="set_terms"></textarea>
+        <button class="btn" onclick="updateSettings()">حفظ وتحديث البطاقات</button>
+    </div>
+</div>
+
+<div id="historyModal" class="modal">
+    <div class="modal-content">
+        <h3>سجل عمليات العميلة</h3>
+        <table id="histTable"><thead><tr><th>التاريخ</th><th>العملية</th><th>الرصيد</th></tr></thead><tbody id="histBody"></tbody></table>
+        <button class="btn" onclick="document.getElementById('historyModal').style.display='none'">إغلاق</button>
+    </div>
+</div>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSy...",
+        authDomain: "primedigitals-1802f.firebaseapp.com",
+        projectId: "primedigitals-1802f",
+        storageBucket: "primedigitals-1802f.appspot.com",
+        messagingSenderId: "774910246237",
+        appId: "1:774910246237:web:866236b8a8b13d28913210"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    function initAdmin() { loadData(); loadSettings(); }
+
+    function loadData() {
+        db.collection("customers").onSnapshot(snap => {
+            const table = document.getElementById('userTable');
+            table.innerHTML = '';
+            let totalP = 0;
+            document.getElementById('totalCust').innerText = snap.size;
+            
+            snap.forEach(doc => {
+                const c = doc.data();
+                totalP += (c.points || 0);
+                table.innerHTML += `<tr>
+                    <td>${c.name}</td><td>${c.phone}</td><td>${c.points}</td>
+                    <td>
+                        <button class="btn" onclick="addPoints('${doc.id}', ${c.points})">+ نقاط</button>
+                        <button class="btn" style="background:#444" onclick="showHistory('${doc.id}')">السجل</button>
+                    </td>
+                </tr>`;
+            });
+            document.getElementById('totalPoints').innerText = totalP;
+        });
+    }
+
+    async function addPoints(id, current) {
+        const val = prompt("أدخل عدد النقاط للإضافة:");
+        if(!val) return;
+        const added = parseInt(val);
+        const now = new Date().toLocaleString('ar-EG');
+        await db.collection("customers").doc(id).update({
+            points: current + added,
+            history: firebase.firestore.FieldValue.arrayUnion({ date: now, action: `+${added}`, total: current + added })
+        });
+    }
+
+    async function showHistory(id) {
+        const doc = await db.collection("customers").doc(id).get();
+        const history = doc.data().history || [];
+        const body = document.getElementById('histBody');
+        body.innerHTML = history.reverse().map(h => `<tr><td>${h.date}</td><td>${h.action}</td><td>${h.total}</td></tr>`).join('');
+        document.getElementById('historyModal').style.display = 'flex';
+    }
+
+    function switchTab(tab) {
+        document.getElementById('stats-tab').style.display = tab==='stats'?'block':'none';
+        document.getElementById('customers-tab').style.display = tab==='customers'?'block':'none';
+        document.getElementById('settings-tab').style.display = tab==='settings'?'block':'none';
+    }
+
+    async function updateSettings() {
+        await db.collection("settings").doc("main").set({
+            logoUrl: document.getElementById('set_logo').value,
+            pointNote: document.getElementById('set_note').value,
+            whatsapp: document.getElementById('set_wa').value,
+            terms: document.getElementById('set_terms').value
+        }, { merge: true });
+        alert("تم تحديث إعدادات جميع البطاقات!");
+    }
+
+    async function loadSettings() {
+        const doc = await db.collection("settings").doc("main").get();
+        if(doc.exists) {
+            const s = doc.data();
+            document.getElementById('set_logo').value = s.logoUrl || "";
+            document.getElementById('set_note').value = s.pointNote || "";
+        }
+    }
+</script>
+</body>
+</html>
