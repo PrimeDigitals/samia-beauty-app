@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>سامية بيوتي - بطاقة الولاء</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background-color: #fcf1f4; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
+        .container { background-color: #ffffff; padding: 30px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); text-align: center; width: 100%; max-width: 400px; }
+        .logo { width: 120px; max-height: 120px; margin-bottom: 15px; object-fit: contain; }
+        h2 { color: #5a3e4a; margin-bottom: 5px; }
+        .points-info { background-color: #fdf5e6; color: #d4af37; padding: 10px; border-radius: 8px; font-weight: bold; font-size: 14px; margin-bottom: 20px; border: 1px dashed #d4af37; }
+        .input-group { margin-bottom: 15px; text-align: right; }
+        input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 14px; }
+        .btn-submit { background-color: #d4af37; color: white; border: none; padding: 15px; width: 100%; border-radius: 8px; font-size: 16px; cursor: pointer; font-weight: bold; }
+        
+        /* قسم البطاقة والـ QR */
+        #cardSection { display: none; margin-top: 20px; }
+        #qrcode { display: flex; justify-content: center; margin: 20px 0; padding: 10px; background: #fff; border-radius: 10px; }
+        .points-large { font-size: 32px; color: #d4af37; font-weight: bold; margin-bottom: 10px; }
+        
+        /* زر الإضافة للشاشة الرئيسية */
+        .btn-add-home { background-color: #000; color: white; border: none; padding: 14px; width: 100%; border-radius: 8px; font-size: 15px; cursor: pointer; font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 15px; }
+        
+        details { text-align: right; margin-top: 15px; background: #f9f9f9; border-radius: 8px; padding: 10px; border: 1px solid #eee; }
+        summary { cursor: pointer; font-weight: bold; color: #5a3e4a; outline: none; }
+        .details-content { font-size: 13px; color: #666; margin-top: 10px; line-height: 1.6; white-space: pre-line; }
+        .social-icons { margin-top: 25px; display: flex; justify-content: center; gap: 15px; }
+        .social-icons a { color: #5a3e4a; font-size: 24px; text-decoration: none; }
+    </style>
+</head>
+<body onload="initApp()">
+
+<div class="container">
+    <img src="https://via.placeholder.com/120?text=Samia+Beauty" alt="Logo" class="logo" id="salonLogo">
+    <h2 id="titleHeader">برنامج مكافآت سامية بيوتي</h2>
+    <div class="points-info" id="pointsNote">جاري تحميل البيانات...</div>
+
+    <div id="registerForm">
+        <div class="input-group"><input type="text" id="custName" placeholder="الاسم الكريم" required></div>
+        <div class="input-group"><input type="tel" id="custPhone" placeholder="رقم الجوال (05xxxxxxxx)" required></div>
+        <button class="btn-submit" onclick="processRegistration()">إصدار بطاقتي الرقمية</button>
+    </div>
+
+    <div id="cardSection">
+        <div class="points-large" id="displayPoints">0 نقطة</div>
+        <div id="qrcode"></div>
+        <p style="font-size: 12px; color: #888;">أظهري الكود للموظفة عند زيارتك القادمة</p>
+        
+        <button class="btn-add-home" onclick="promptInstall()">
+            <i class="fa-solid fa-mobile-screen-button"></i> إضافة البطاقة للشاشة الرئيسية
+        </button>
+    </div>
+
+    <details><summary>معلومات البطاقة</summary><div class="details-content" id="infoBox"></div></details>
+    <details><summary>شروط الاستخدام</summary><div class="details-content" id="termsBox"></div></details>
+
+    <div class="social-icons">
+        <a href="#" id="linkWa" target="_blank"><i class="fa-brands fa-whatsapp"></i></a>
+        <a href="#" id="linkInsta" target="_blank"><i class="fa-brands fa-instagram"></i></a>
+        <a href="#" id="linkSnap" target="_blank"><i class="fa-brands fa-snapchat"></i></a>
+    </div>
+</div>
+
+<script>
+    // إعدادات الـ Firebase الخاصة بك
+    const firebaseConfig = {
+        apiKey: "ضع_مفتاحك_هنا", 
+        authDomain: "primedigitals-1802f.firebaseapp.com",
+        projectId: "primedigitals-1802f",
+        storageBucket: "primedigitals-1802f.appspot.com",
+        messagingSenderId: "774910246237",
+        appId: "1:774910246237:web:866236b8a8b13d28913210"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    function initApp() {
+        loadSalonSettings();
+    }
+
+    async function loadSalonSettings() {
+        const doc = await db.collection("settings").doc("main").get();
+        if(doc.exists) {
+            const s = doc.data();
+            if(s.logoUrl) document.getElementById('salonLogo').src = s.logoUrl;
+            document.getElementById('pointsNote').innerText = s.pointNote || "كل 1 نقطة = 1 ريال مكافأة";
+            document.getElementById('infoBox').innerText = s.cardInfo || "";
+            document.getElementById('termsBox').innerText = s.terms || "";
+            document.getElementById('linkWa').href = s.whatsapp || "#";
+            document.getElementById('linkInsta').href = s.insta || "#";
+            document.getElementById('linkSnap').href = s.snap || "#";
+        }
+    }
+
+    async function processRegistration() {
+        const name = document.getElementById('custName').value;
+        const phone = document.getElementById('custPhone').value;
+        
+        if(!name || !phone) return alert("يرجى إدخال الاسم ورقم الجوال");
+
+        // البحث عن العميلة في Firebase
+        const query = await db.collection("customers").where("phone", "==", phone).get();
+        
+        if(!query.empty) {
+            // عميلة سابقة
+            const userDoc = query.docs[0];
+            renderUserCard(userDoc.id, userDoc.data());
+        } else {
+            // عميلة جديدة
+            const newDoc = await db.collection("customers").add({
+                name: name,
+                phone: phone,
+                points: 0,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            const data = (await newDoc.get()).data();
+            renderUserCard(newDoc.id, data);
+        }
+    }
+
+    function renderUserCard(docId, userData) {
+        document.getElementById('registerForm').style.display = 'none';
+        document.getElementById('cardSection').style.display = 'block';
+        document.getElementById('titleHeader').innerText = "أهلاً بكِ، " + userData.name;
+        document.getElementById('displayPoints').innerText = userData.points + " نقطة";
+
+        // توليد QR Code
+        document.getElementById('qrcode').innerHTML = "";
+        new QRCode(document.getElementById("qrcode"), {
+            text: userData.phone,
+            width: 160,
+            height: 160
+        });
+
+        // مراقبة النقاط لحظياً
+        db.collection("customers").doc(docId).onSnapshot(snapshot => {
+            if(snapshot.exists) {
+                document.getElementById('displayPoints').innerText = snapshot.data().points + " نقطة";
+            }
+        });
+    }
+
+    function promptInstall() {
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        if (isIOS) {
+            alert("لحفظ البطاقة على آيفون:\n1. اضغطي على زر 'المشاركة' في الأسفل.\n2. اختاري 'إضافة للشاشة الرئيسية' (Add to Home Screen).");
+        } else {
+            alert("لحفظ البطاقة على أندرويد:\n1. اضغطي على الـ 3 نقاط في زاوية المتصفح.\n2. اختاري 'تثبيت التطبيق' أو 'إضافة للشاشة الرئيسية'.");
+        }
+    }
+</script>
+</body>
+</html>
