@@ -7,93 +7,150 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-messaging-compat.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background-color: #fcf1f4; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background-color: #fcf1f4; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
         .container { background-color: #ffffff; padding: 30px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); text-align: center; width: 100%; max-width: 400px; }
-        .logo { width: 120px; margin-bottom: 15px; }
-        .btn-submit { background-color: #d4af37; color: white; border: none; padding: 15px; width: 100%; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        .logo { width: 150px; margin-bottom: 15px; object-fit: contain; }
+        h2 { color: #5a3e4a; margin-bottom: 5px; }
+        .points-info { background-color: #fdf5e6; color: #d4af37; padding: 10px; border-radius: 8px; font-weight: bold; font-size: 14px; margin-bottom: 20px; border: 1px dashed #d4af37; }
+        .input-group { margin-bottom: 15px; text-align: right; }
+        input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 14px; }
+        .btn-submit { background-color: #d4af37; color: white; border: none; padding: 15px; width: 100%; border-radius: 8px; font-size: 16px; cursor: pointer; font-weight: bold; margin-bottom: 10px; }
         #cardSection { display: none; margin-top: 20px; }
-        #qrcode { display: flex; justify-content: center; margin: 20px 0; }
+        #qrcode { display: flex; justify-content: center; margin: 20px 0; padding: 10px; background: #fff; border-radius: 10px; }
+        .points-large { font-size: 35px; color: #d4af37; font-weight: bold; margin-bottom: 10px; }
+        
+        /* أزرار المحفظة */
+        .wallet-btn { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 12px; border-radius: 8px; font-size: 15px; cursor: pointer; font-weight: bold; margin-top: 10px; border: none; }
+        .apple-wallet { background-color: #000; color: white; }
+        .google-wallet { background-color: #f8f9fa; color: #3c4043; border: 1px solid #dadce0; }
+        
+        details { text-align: right; margin-top: 15px; background: #f9f9f9; border-radius: 8px; padding: 10px; border: 1px solid #eee; }
+        summary { cursor: pointer; font-weight: bold; color: #5a3e4a; outline: none; }
+        .details-content { font-size: 13px; color: #666; margin-top: 10px; line-height: 1.6; white-space: pre-line; }
+        .social-icons { margin-top: 25px; display: flex; justify-content: center; gap: 15px; }
+        .social-icons a { color: #5a3e4a; font-size: 24px; text-decoration: none; }
     </style>
 </head>
 <body onload="initApp()">
+
 <div class="container">
-    <img src="https://via.placeholder.com/120?text=Samia+Beauty" alt="Logo" class="logo" id="salonLogo">
+    <img src="https://static.wixstatic.com/media/b7a6a0_6c664e0f487b45e7a08841be4eb5255f~mv2.png" alt="Samia Beauty Logo" class="logo" id="salonLogo">
     <h2 id="titleHeader">نادي ولاء سامية بيوتي</h2>
+    <div class="points-info" id="pointsNote">كل 1 نقطة = 1 ريال مكافأة</div>
+
     <div id="registerForm">
-        <input type="text" id="custName" placeholder="الاسم" style="width:100%; padding:12px; margin-bottom:10px; border-radius:8px; border:1px solid #ddd;">
-        <input type="tel" id="custPhone" placeholder="رقم الجوال" style="width:100%; padding:12px; margin-bottom:10px; border-radius:8px; border:1px solid #ddd;">
-        <button class="btn-submit" onclick="processRegistration()">تفعيل البطاقة</button>
+        <div class="input-group"><input type="text" id="custName" placeholder="الاسم الكريم" required></div>
+        <div class="input-group"><input type="tel" id="custPhone" placeholder="رقم الجوال (05xxxxxxxx)" required></div>
+        <button class="btn-submit" onclick="processRegistration()">إصدار البطاقة</button>
     </div>
+
     <div id="cardSection">
-        <div style="font-size:32px; color:#d4af37; font-weight:bold;" id="displayPoints">0 نقطة</div>
+        <div class="points-large" id="displayPoints">0 نقطة</div>
         <div id="qrcode"></div>
-        <button class="btn-submit" style="background:#000" onclick="alert('اضغطي مشاركة ثم إضافة للشاشة الرئيسية')">إضافة للشاشة الرئيسية</button>
+        <p style="font-size: 12px; color: #888;">أظهري الكود للموظفة عند زيارتك القادمة</p>
+        
+        <button class="wallet-btn apple-wallet" onclick="addToWallet('apple')">
+            <i class="fa-brands fa-apple" style="font-size: 20px;"></i> إضافة إلى Apple Wallet
+        </button>
+        <button class="wallet-btn google-wallet" onclick="addToWallet('google')">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/f/f2/Google_Wallet_Icon_2022.svg" alt="Google Wallet" width="20"> إضافة إلى Google Wallet
+        </button>
+    </div>
+
+    <details><summary>معلومات البطاقة</summary><div class="details-content" id="infoBox">بطاقة ولاء سامية بيوتي صالحة لجميع الخدمات.</div></details>
+    <details><summary>شروط الاستخدام</summary><div class="details-content" id="termsBox">تخضع لشروط وأحكام الصالون.</div></details>
+
+    <div class="social-icons">
+        <a href="https://www.samiabeauty.com/" target="_blank" title="الموقع الإلكتروني"><i class="fa-solid fa-globe"></i></a>
+        <a href="#" id="linkWa" target="_blank"><i class="fa-brands fa-whatsapp"></i></a>
+        <a href="#" id="linkInsta" target="_blank"><i class="fa-brands fa-instagram"></i></a>
+        <a href="#" id="linkSnap" target="_blank"><i class="fa-brands fa-snapchat"></i></a>
     </div>
 </div>
 
 <script>
+    // مفاتيح Firebase (تأكد من وضع مفتاحك الفعلي هنا)
     const firebaseConfig = {
-        apiKey: "AIzaSy...", // مفتاحك
+        apiKey: "AIzaSy...", 
         authDomain: "primedigitals-1802f.firebaseapp.com",
         projectId: "primedigitals-1802f",
         storageBucket: "primedigitals-1802f.appspot.com",
         messagingSenderId: "774910246237",
         appId: "1:774910246237:web:866236b8a8b13d28913210"
     };
+
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
-    const messaging = firebase.messaging();
+    let currentUserData = null;
 
-    function initApp() {
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('firebase-messaging-sw.js')
-            .then(reg => console.log('SW Registered')).catch(err => console.log('SW Error', err));
+    async function initApp() {
+        const doc = await db.collection("settings").doc("main").get();
+        if(doc.exists) {
+            const s = doc.data();
+            if(s.logoUrl) document.getElementById('salonLogo').src = s.logoUrl;
+            document.getElementById('pointsNote').innerText = s.pointNote || "كل 1 نقطة = 1 ريال مكافأة";
+            document.getElementById('infoBox').innerText = s.cardInfo || "";
+            document.getElementById('termsBox').innerText = s.terms || "";
+            document.getElementById('linkWa').href = s.whatsapp || "#";
+            document.getElementById('linkInsta').href = s.insta || "#";
+            document.getElementById('linkSnap').href = s.snap || "#";
         }
     }
 
     async function processRegistration() {
         const name = document.getElementById('custName').value;
         const phone = document.getElementById('custPhone').value;
-        if(!name || !phone) return alert("يرجى ملء البيانات");
+        if(!name || !phone) return alert("يرجى إدخال الاسم ورقم الجوال");
 
         const query = await db.collection("customers").where("phone", "==", phone).get();
-        let docId;
+        
         if(!query.empty) {
-            docId = query.docs[0].id;
-            renderCard(docId, query.docs[0].data());
+            renderUserCard(query.docs[0].id, query.docs[0].data());
         } else {
-            const res = await db.collection("customers").add({
-                name, phone, points: 0, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            const newDoc = await db.collection("customers").add({
+                name: name,
+                phone: phone,
+                points: 0,
+                history: [],
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
-            docId = res.id;
-            renderCard(docId, { name, phone, points: 0 });
+            const data = (await newDoc.get()).data();
+            renderUserCard(newDoc.id, data);
         }
-        askPermission(docId);
     }
 
-    function renderCard(docId, data) {
+    function renderUserCard(docId, userData) {
+        currentUserData = userData;
         document.getElementById('registerForm').style.display = 'none';
         document.getElementById('cardSection').style.display = 'block';
-        new QRCode(document.getElementById("qrcode"), { text: data.phone, width: 150, height: 150 });
-        db.collection("customers").doc(docId).onSnapshot(doc => {
-            document.getElementById('displayPoints').innerText = doc.data().points + " نقطة";
+        document.getElementById('displayPoints').innerText = userData.points + " نقطة";
+        document.getElementById('qrcode').innerHTML = "";
+        new QRCode(document.getElementById("qrcode"), { text: userData.phone, width: 160, height: 160 });
+
+        db.collection("customers").doc(docId).onSnapshot(snapshot => {
+            if(snapshot.exists) {
+                currentUserData = snapshot.data();
+                document.getElementById('displayPoints').innerText = snapshot.data().points + " نقطة";
+            }
         });
     }
 
-    function askPermission(docId) {
-        Notification.requestPermission().then(async (permission) => {
-            if (permission === 'granted') {
-                // استخدام مفتاح VAPID الذي أرسلته
-                const token = await messaging.getToken({ vapidKey: 'BA-hdtd_zsaR2lPhSZWKpuolJhGVl4q5rRkMuAi7h4gd4ol1Yu_x6nAl1K5Hjtr3y_yGIvHmka6dsQ4H8uFsulo' });
-                if (token) {
-                    await db.collection("customers").doc(docId).update({ fcmToken: token });
-                    console.log("Token saved!");
-                }
-            }
-        });
+    function addToWallet(walletType) {
+        if (!currentUserData) return;
+        
+        // هنا يتم إنشاء الرابط الديناميكي للخدمة المجانية (مثل PassKit API)
+        // يقوم بأخذ اسم العميلة ونقاطها وتوليد البطاقة فوراً
+        const passData = encodeURIComponent(`name=${currentUserData.name}&phone=${currentUserData.phone}&points=${currentUserData.points}`);
+        
+        if (walletType === 'apple') {
+            alert("لإتمام الربط المجاني، سيتم توجيه العميلة لرابط إصدار بطاقة Apple Wallet.");
+            // window.location.href = `https://your-free-pass-generator.com/api/apple?${passData}`;
+        } else if (walletType === 'google') {
+            alert("لإتمام الربط المجاني، سيتم توجيه العميلة لرابط إصدار بطاقة Google Wallet.");
+            // window.location.href = `https://your-free-pass-generator.com/api/google?${passData}`;
+        }
     }
 </script>
 </body>
